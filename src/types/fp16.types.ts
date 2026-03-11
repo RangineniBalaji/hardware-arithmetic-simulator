@@ -15,6 +15,7 @@ export interface ALUStage {
   name: string;
   description: string;
   details: string[];
+  educationalExplanations?: string[];
   binaryData?: string;
   values?: Record<string, number | string>;
 }

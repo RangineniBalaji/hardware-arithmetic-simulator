@@ -64,31 +64,31 @@ export default function LogicLegend() {
   };
 
   return (
-    <div className="border border-slate-700 rounded-xl p-6 backdrop-blur-sm bg-slate-800/30 sticky top-6">
+    <div className="border border-gray-200 rounded-xl p-6 bg-white shadow-sm sticky top-6">
       <div className="flex items-center gap-2 mb-4">
-        <BookOpen className="w-5 h-5 text-indigo-400" />
-        <h3 className="text-lg font-semibold text-white">Logic Legend</h3>
+        <BookOpen className="w-5 h-5 text-indigo-600" />
+        <h3 className="text-lg font-semibold text-gray-900">Logic Legend</h3>
       </div>
 
       <div className="space-y-2">
         {legendItems.map((item, index) => (
-          <div key={index} className="border border-slate-700 rounded-lg overflow-hidden bg-slate-900/30">
+          <div key={index} className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm">
             <button
               onClick={() => toggleItem(index)}
-              className="w-full flex items-center justify-between p-3 hover:bg-slate-700/20 transition-colors"
+              className="w-full flex items-center justify-between p-3 hover:bg-gray-50 transition-colors"
             >
               <div className="text-left">
-                <div className="text-sm font-semibold text-indigo-300">{item.term}</div>
-                <div className="text-xs text-slate-400">{item.definition}</div>
+                <div className="text-sm font-semibold text-indigo-700">{item.term}</div>
+                <div className="text-xs text-gray-500 font-medium">{item.definition}</div>
               </div>
               {expandedItems.has(index) ? (
-                <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <ChevronUp className="w-4 h-4 text-gray-400 flex-shrink-0" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                <ChevronDown className="w-4 h-4 text-gray-400 flex-shrink-0" />
               )}
             </button>
             {expandedItems.has(index) && (
-              <div className="px-3 pb-3 text-xs text-slate-300 leading-relaxed border-t border-slate-700 pt-3">
+              <div className="px-3 pb-3 text-xs text-gray-600 leading-relaxed border-t border-gray-100 pt-3 bg-gray-50">
                 {item.details}
               </div>
             )}
@@ -96,9 +96,9 @@ export default function LogicLegend() {
         ))}
       </div>
 
-      <div className="mt-6 p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-lg">
-        <div className="text-xs font-semibold text-indigo-300 mb-2">Hardware Insight</div>
-        <div className="text-xs text-slate-300 leading-relaxed">
+      <div className="mt-6 p-4 bg-indigo-50 border border-indigo-100 rounded-lg shadow-sm">
+        <div className="text-xs font-bold text-indigo-800 mb-2">Hardware Insight</div>
+        <div className="text-xs text-indigo-900/80 leading-relaxed font-medium">
           Real FP16 ALUs perform operations on integer representations. The "scale-first" approach multiplies values by 2^10, operates on integers, then normalizes back. This is why precision is limited!
         </div>
       </div>
