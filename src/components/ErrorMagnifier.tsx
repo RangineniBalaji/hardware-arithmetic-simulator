@@ -55,7 +55,7 @@ export default function ErrorMagnifier({ trueMath, fp16Result, quantizationError
         )}
 
         <div className="text-xs text-gray-500 leading-relaxed bg-gray-50 p-3 rounded border border-gray-100">
-          This error occurs because FP16 uses only 10 bits for the fraction(mantissa), limiting precision to approximately 3-4 decimal digits. The rounding process in Stage 4 introduces additional quantization.
+          This error occurs because FP16 uses only 10 bits for the fraction (mantissa), limiting precision to approximately 3-4 decimal digits. The rounding process in Stage 4 introduces additional quantization.
         </div>
       </div>
     </div>
