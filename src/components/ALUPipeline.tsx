@@ -72,7 +72,7 @@ export default function ALUPipeline({ stages, isAnimating = false }: ALUPipeline
 
       {selectedStage && (
         <div className="fixed inset-0 bg-gray-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[80vh] overflow-y-auto overflow-x-hidden animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-6 border-b border-gray-100 bg-gray-50/80">
               <div>
                 <h2 className="text-xl font-bold text-gray-900">{selectedStage.name}</h2>
