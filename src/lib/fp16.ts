@@ -171,6 +171,7 @@ export class FP16 {
 
     let resultExp = largerExp;
     let normalizeShift = 0;
+    const preNormMantissa = resultMantissa; // save for explanation
 
     if (resultMantissa >= 2048) {
       normalizeShift = -1;
@@ -188,21 +189,23 @@ export class FP16 {
       name: 'Stage 3: Normalize',
       description: 'Adjust mantissa and exponent to standard form',
       details: [
-        `Raw result mantissa (Base 10: ${resultMantissa}): ${resultMantissa.toString(2)}`,
-        `Normalization shift: ${normalizeShift > 0 ? 'Left' : normalizeShift < 0 ? 'Right' : 'None'} by ${Math.abs(normalizeShift)} bits. Hardware shifts the mantissa until the leading bit is 1.`,
-        `Normalized mantissa (Base 10: ${resultMantissa}): ${resultMantissa.toString(2).padStart(11, '0')}`,
+        `Pre-normalization mantissa (Base 10: ${preNormMantissa}): ${preNormMantissa.toString(2).padStart(11, '0')}`,
+        `Normalization shift: ${normalizeShift > 0 ? 'Left' : normalizeShift < 0 ? 'Right' : 'None'} by ${Math.abs(normalizeShift)} bits`,
+        `Post-normalization mantissa (Base 10: ${resultMantissa}): ${resultMantissa.toString(2).padStart(11, '0')}`,
         `Result exponent (Base 10: ${resultExp}): ${resultExp} (biased by +15: ${resultExp + 15})`,
       ],
       educationalExplanations: [
-        `Why do we need to normalize?\nAfter adding the two aligned numbers, the result might not be in standard scientific notation anymore.`,
-        `For example, if you add 9.0 × 10² and 2.0 × 10², you get 11.0 × 10². That's not valid scientific notation! You have to "normalize" it to 1.1 × 10³.`,
-        `In binary, a normalized hardware number MUST start with exactly one '1' before the binary point (e.g., 1.xxxx...).`,
-        `If the addition caused a carry-over (like our 9+2=11 example), the hardware shifts the mantissa right by 1 bit and adds 1 to the exponent.`,
-        `If the addition was actually a subtraction (adding a negative number) and leading bits canceled out (e.g., 1.001 - 1.000 = 0.001), the hardware shifts the mantissa left to find the first '1', and subtracts from the exponent.`
+        `Why do we need to normalize?\nAfter adding the two aligned numbers, the raw result might be outside the range [1.0,2.0) in binary. Normalization brings it back into that range so it fits the floating‑point format.`,
+        `The mantissa before normalization is shown above as an 11‑bit integer and its binary representation.`,
+        `If the addition caused a carry (e.g. 1.1_ + 1.0_ = 10.1_ in binary), the mantissa is too large (>=2048) and we shift it right by one bit while incrementing the exponent.`,
+        `If the mantissa became too small (leading zeros after the implicit 1 disappeared as when subtracting nearly equal numbers), we shift left until the leading bit is 1, decrementing the exponent for each shift.`,
+        `The integer and bit representations before and after normalization help you trace exactly how the value changes during this step.`,
       ],
       values: {
+        'pre_norm_mantissa': preNormMantissa,
         'normalized_mantissa': resultMantissa,
         'result_exp': resultExp,
+        'normalize_shift': normalizeShift,
       }
     });
 
@@ -251,6 +254,26 @@ export class FP16 {
     if (resultExp > 15) {
       const infinityBits = resultSign ? 0xfc00 : 0x7c00;
       const result = FP16.fromBits(infinityBits.toString(2).padStart(16, '0'));
+      
+      stages.push({
+        name: 'Stage 5: Pack (Overflow)',
+        description: 'Exponent overflowed maximum, pack as Infinity',
+        details: [
+          `Resulting exponent ${resultExp} is greater than the maximum allowed (15).`,
+          `Hardware clamps the result to ±Infinity.`,
+          `Packed 16-bit binary: ${result.getBits()}`,
+          `Final decimal value: ${result.toFloat()}`
+        ],
+        educationalExplanations: [
+          `What happens when a number gets too big?\nThe 5-bit exponent can only hold values up to 31 (which means an actual exponent of 15 after the +15 bias).`,
+          `Because our math resulted in an exponent larger than 15, the hardware physically cannot store this number. This is called an "overflow".`,
+          `Instead of trying to store a corrupted number, the hardware uses a special predefined bit pattern to represent "Infinity" (all 1s in the exponent, all 0s in the fraction).`
+        ],
+        values: {
+          'result_bits': result.getBits()
+        }
+      });
+      
       return {
         bits: result.getBits(),
         decimal: result.toFloat(),
@@ -267,6 +290,31 @@ export class FP16 {
     const biasedExp = resultExp < -14 ? 0 : resultExp + 15;
     const resultBits = (resultSign << 15) | (biasedExp << 10) | finalFraction;
     const result = FP16.fromBits(resultBits.toString(2).padStart(16, '0'));
+
+    stages.push({
+      name: 'Stage 5: Pack',
+      description: 'Assemble final 16-bit floating point value',
+      details: [
+        `Sign bit: ${resultSign}`,
+        `Biased Exponent: ${biasedExp} = ${biasedExp.toString(2).padStart(5, '0')}`,
+        `Fraction: ${finalFraction} = ${finalFraction.toString(2).padStart(10, '0')}`,
+        `Packed 16-bit binary: ${result.getBits()}`,
+        `Final decimal value: ${result.toFloat()}`
+      ],
+      educationalExplanations: [
+        `How is the final number stored?\nAfter all our math is done, we have three distinct pieces of information: the sign (+ or -), the exponent, and the 10-bit fraction.`,
+        `The hardware packs these three pieces back together into a single 16-bit word, exactly matching the format we started with.`,
+        `Bit 15 (the highest bit) gets the sign (0 for positive, 1 for negative).`,
+        `Bits 10-14 get the 5-bit biased exponent.`,
+        `Bits 0-9 get the 10-bit fraction. The implicit '1' is dropped again, saving it only in the hardware's imagination until the next operation.`,
+        `This final 16-bit binary string is what gets saved back out to the computer's memory.`
+      ],
+      values: {
+        'sign_bit': resultSign,
+        'exp_bits': biasedExp.toString(2).padStart(5, '0'),
+        'frac_bits': finalFraction.toString(2).padStart(10, '0'),
+      }
+    });
 
     return {
       bits: result.getBits(),
@@ -419,9 +467,29 @@ export class FP16 {
       }
     });
 
-    if (resultExp > 15) {
+     if (resultExp > 15) {
       const infinityBits = resultSign ? 0xfc00 : 0x7c00;
       const result = FP16.fromBits(infinityBits.toString(2).padStart(16, '0'));
+      
+      stages.push({
+        name: 'Stage 5: Pack (Overflow)',
+        description: 'Exponent overflowed maximum, pack as Infinity',
+        details: [
+          `Resulting exponent ${resultExp} is greater than the maximum allowed (15).`,
+          `Hardware clamps the result to ±Infinity.`,
+          `Packed 16-bit binary: ${result.getBits()}`,
+          `Final decimal value: ${result.toFloat()}`
+        ],
+        educationalExplanations: [
+          `What happens when a number gets too big?\nThe 5-bit exponent can only hold values up to 31 (which means an actual exponent of 15 after the +15 bias).`,
+          `Because our math resulted in an exponent larger than 15, the hardware physically cannot store this number. This is called an "overflow".`,
+          `Instead of trying to store a corrupted number, the hardware uses a special predefined bit pattern to represent "Infinity" (all 1s in the exponent, all 0s in the fraction).`
+        ],
+        values: {
+          'result_bits': result.getBits()
+        }
+      });
+      
       return {
         bits: result.getBits(),
         decimal: result.toFloat(),
@@ -438,6 +506,32 @@ export class FP16 {
     const biasedExp = resultExp < -14 ? 0 : resultExp + 15;
     const resultBits = (resultSign << 15) | (biasedExp << 10) | finalFraction;
     const result = FP16.fromBits(resultBits.toString(2).padStart(16, '0'));
+
+    stages.push({
+      name: 'Stage 5: Pack',
+      description: 'Assemble final 16-bit floating point value',
+      details: [
+        `Sign bit: ${resultSign}`,
+        `Biased Exponent: ${biasedExp} = ${biasedExp.toString(2).padStart(5, '0')}`,
+        `Fraction: ${finalFraction} (${resultMantissa} - 1024) = ${finalFraction.toString(2).padStart(10, '0')}`,
+        `${resultMantissa} is the 11 bit mantissa with the implicit 1, so we subtract 1024 to get the actual fraction value.`,
+        `Packed 16-bit binary: ${result.getBits()}`,
+        `Final decimal value: ${result.toFloat()}`
+      ],
+      educationalExplanations: [
+        `How is the final number stored?\nAfter all our math is done, we have three distinct pieces of information: the sign (+ or -), the exponent, and the 10-bit fraction.`,
+        `The hardware packs these three pieces back together into a single 16-bit word, exactly matching the format we started with.`,
+        `Bit 15 (the highest bit) gets the sign (0 for positive, 1 for negative).`,
+        `Bits 10-14 get the 5-bit biased exponent.`,
+        `Bits 0-9 get the 10-bit fraction. The implicit '1' is dropped again, saving it only in the hardware's imagination until the next operation.`,
+        `This final 16-bit binary string is what gets saved back out to the computer's memory.`
+      ],
+      values: {
+        'sign_bit': resultSign,
+        'exp_bits': biasedExp.toString(2).padStart(5, '0'),
+        'frac_bits': finalFraction.toString(2).padStart(10, '0'),
+      }
+    });
 
     return {
       bits: result.getBits(),
